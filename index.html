@@ -1,0 +1,2241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none';" />
+  <title>Sudokube</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:     #07070f;
+      --accent: #e8ff47;
+      --dim:    rgba(255,255,255,0.22);
+      --dimmer: rgba(255,255,255,0.08);
+      --text:   #efefef;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── CANVAS ─────────────────────────────── */
+    #bg-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+    }
+
+    .feedback-pulse {
+      --pulse-rgb: 255,255,255;
+      --pulse-core-alpha: 0;
+      --pulse-mid-alpha: 0;
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0;
+      background:
+        radial-gradient(circle at 50% 50%,
+          rgba(var(--pulse-rgb), 0) 0 38%,
+          rgba(var(--pulse-rgb), var(--pulse-core-alpha)) 42%,
+          rgba(var(--pulse-rgb), var(--pulse-mid-alpha)) 48%,
+          rgba(var(--pulse-rgb), 0) 56%);
+      transform: scale(0.08);
+    }
+
+    .feedback-pulse.pulse {
+      animation: feedbackPulse var(--pulse-duration, 620ms) cubic-bezier(.15,.72,.24,1);
+    }
+
+    .feedback-pulse.pulse-complete {
+      animation-name: completeFeedbackPulse;
+    }
+
+    @keyframes feedbackPulse {
+      0% {
+        opacity: 0.95;
+        transform: scale(0.08);
+      }
+      18% {
+        opacity: 1;
+        transform: scale(0.28);
+      }
+      100% {
+        opacity: 0;
+        transform: scale(3.2);
+      }
+    }
+
+    @keyframes completeFeedbackPulse {
+      0% {
+        opacity: 1;
+        transform: scale(0.05);
+      }
+      20% {
+        opacity: 1;
+        transform: scale(0.46);
+      }
+      100% {
+        opacity: 0;
+        transform: scale(5.4);
+      }
+    }
+
+    /* ── SCREENS ─────────────────────────────── */
+    .screen {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .screen.active { pointer-events: all; }
+
+    /* ── INTRO ───────────────────────────────── */
+    #intro {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+    }
+
+    .intro-title {
+      position: fixed;
+      top: clamp(28px, 8vh, 76px);
+      left: 50%;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(52px, 7vw, 84px);
+      letter-spacing: 0.12em;
+      color: var(--text);
+      white-space: nowrap;
+      opacity: 0;
+      transform: translate(-50%, -10px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+      margin-bottom: 0;
+    }
+
+    /* spacer — cube lives here, canvas renders it */
+    .cube-space {
+      width: 340px;
+      height: 340px;
+      flex-shrink: 0;
+    }
+
+    .intro-bottom {
+      position: fixed;
+      left: 50%;
+      bottom: clamp(28px, 7vh, 72px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      margin-top: 0;
+      opacity: 0;
+      transform: translate(-50%, 10px);
+      transition: opacity 0.5s ease 0.15s, transform 0.5s ease 0.15s;
+    }
+
+    .intro-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    /* active state for intro */
+    #intro.active .intro-title,
+    #intro.active .intro-bottom {
+      opacity: 1;
+      transform: none;
+    }
+    #intro.active .intro-title {
+      transform: translateX(-50%);
+    }
+    #intro.active .intro-bottom {
+      transform: translateX(-50%);
+    }
+    #intro.exit .intro-title,
+    #intro.exit .intro-bottom {
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    #intro.exit .intro-title {
+      transform: translate(-50%, -8px);
+    }
+    #intro.exit .intro-bottom {
+      transform: translate(-50%, -8px);
+    }
+
+    /* ── SELECT ──────────────────────────────── */
+    #select {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+    }
+
+    #select::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(7,7,15,0.74);
+      opacity: 0;
+      transition: opacity 0.35s ease;
+      z-index: -1;
+    }
+
+    #select.active::before { opacity: 1; }
+
+    .select-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 46px;
+      letter-spacing: 0.1em;
+      margin-bottom: 30px;
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+
+    .option-list {
+      display: flex;
+      flex-direction: column;
+      width: min(380px, calc(100vw - 48px));
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.4s ease 0.08s, transform 0.4s ease 0.08s;
+    }
+
+    .opt {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      min-height: 66px;
+      padding: 16px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.16);
+      cursor: pointer;
+      transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+    }
+    .opt:first-child { border-top: 1px solid rgba(255,255,255,0.16); }
+    .opt:hover {
+      background: rgba(255,255,255,0.06);
+      border-color: rgba(232,255,71,0.38);
+      transform: translateX(4px);
+    }
+    .opt:hover .opt-name { color: var(--accent); }
+    .opt:hover .opt-arrow { color: var(--accent); transform: translateX(3px); }
+
+    .opt-num { font-size: 11px; letter-spacing: 0.15em; color: rgba(232,255,71,0.72); width: 24px; }
+    .opt-body { flex: 1; }
+    .opt-name { font-size: 14px; letter-spacing: 0.06em; transition: color 0.18s; }
+    .opt-desc { font-size: 10px; color: rgba(255,255,255,0.46); letter-spacing: 0.05em; margin-top: 3px; }
+    .opt-arrow { font-size: 14px; color: rgba(255,255,255,0.45); transition: color 0.18s, transform 0.18s; }
+
+    #select.active .select-title,
+    #select.active .option-list,
+    #select.active .back-row { opacity: 1; transform: none; }
+    #select.exit .select-title,
+    #select.exit .option-list,
+    #select.exit .back-row {
+      opacity: 0; transform: translateY(-6px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    /* ── PICKER ──────────────────────────────── */
+    #picker {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+    }
+
+    #picker::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(7,7,15,0.74);
+      opacity: 0;
+      transition: opacity 0.35s ease;
+      z-index: -1;
+    }
+
+    #picker.active::before { opacity: 1; }
+
+    .picker-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 46px;
+      letter-spacing: 0.1em;
+      margin-bottom: 28px;
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+
+    .picker-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 16px;
+      margin-bottom: 12px;
+      opacity: 0;
+      transition: opacity 0.4s ease 0.08s;
+    }
+
+    #puzzle-num-input {
+      background: rgba(255,255,255,0.04);
+      border: none;
+      border-bottom: 2px solid var(--dim);
+      color: var(--text);
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 58px;
+      width: 150px;
+      outline: none;
+      letter-spacing: 0.06em;
+      text-align: center;
+      padding: 4px 8px 2px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    #puzzle-num-input:focus {
+      background: rgba(255,255,255,0.07);
+      border-color: var(--accent);
+    }
+    #puzzle-num-input::placeholder { color: rgba(255,255,255,0.18); }
+
+    .picker-sub {
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      color: rgba(232,255,71,0.72);
+      text-transform: uppercase;
+      margin-bottom: 32px;
+      opacity: 0;
+      transition: opacity 0.4s ease 0.12s;
+    }
+
+    #picker.active .picker-title,
+    #picker.active .picker-row,
+    #picker.active .picker-sub,
+    #picker.active .back-row { opacity: 1; transform: none; }
+    #picker.exit .picker-title,
+    #picker.exit .picker-row,
+    #picker.exit .picker-sub,
+    #picker.exit .back-row {
+      opacity: 0; transform: translateY(-6px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    /* ── GAME HUD ────────────────────────────── */
+    #game-hud {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 28px 36px;
+    }
+
+    .hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      opacity: 0;
+      transition: opacity 0.5s ease 0.5s;
+    }
+    .hud-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 20px;
+      letter-spacing: 0.1em;
+      color: var(--dim);
+    }
+    .hud-id {
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: rgba(232,255,71,0.45);
+      margin-top: 4px;
+    }
+
+    #game-hud.active .hud-top { opacity: 1; }
+    #game-hud.exit .hud-top { opacity: 0; transition: opacity 0.2s ease; }
+
+    .cube-controls {
+      position: fixed;
+      inset: 0;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.45s ease 0.55s, transform 0.45s ease 0.55s;
+      pointer-events: none;
+    }
+    #game-hud.active .cube-controls {
+      opacity: 1;
+      transform: none;
+      pointer-events: none;
+    }
+    #game-hud.exit .cube-controls {
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .control-group {
+      display: grid;
+      gap: 6px;
+    }
+    .view-pad {
+      position: fixed;
+      left: var(--cube-screen-x, 50%);
+      top: var(--cube-screen-y, 44%);
+      width: var(--view-pad-size, min(760px, 94vw));
+      height: var(--view-pad-size, min(760px, 90vh));
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+    .control-label {
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+    .cube-controls .control-group {
+      position: fixed;
+      left: 50%;
+      bottom: 34px;
+      transform: translateX(-50%);
+    }
+    .layer-row {
+      display: grid;
+      grid-template-columns: repeat(3, 58px);
+      gap: 6px;
+    }
+    .view-btn {
+      height: 34px;
+      border: 1px solid var(--dimmer);
+      border-radius: 2px;
+      background: rgba(255,255,255,0.035);
+      color: var(--dim);
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      pointer-events: all;
+      transition: color 0.15s, border-color 0.15s, background 0.15s, transform 0.15s;
+    }
+    .rotate-btn {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      padding: 0;
+      font-size: 20px;
+      line-height: 1;
+      pointer-events: all;
+    }
+    .view-btn:hover {
+      color: var(--text);
+      border-color: var(--dim);
+      transform: translateY(-1px);
+    }
+    .rotate-btn[data-rotate="up"] { left: 50%; top: 24px; transform: translateX(-50%); }
+    .rotate-btn[data-rotate="up"]:hover { transform: translate(-50%, -5px); }
+    .rotate-btn[data-rotate="down"] { left: 50%; bottom: -8px; transform: translateX(-50%); }
+    .rotate-btn[data-rotate="down"]:hover { transform: translate(-50%, 5px); }
+    .rotate-btn[data-rotate="left"] { left: 0; top: 50%; transform: translateY(-50%); }
+    .rotate-btn[data-rotate="left"]:hover { transform: translate(-5px, -50%); }
+    .rotate-btn[data-rotate="right"] { right: 0; top: 50%; transform: translateY(-50%); }
+    .rotate-btn[data-rotate="right"]:hover { transform: translate(5px, -50%); }
+    .view-btn.active {
+      color: #07070f;
+      background: var(--accent);
+      border-color: var(--accent);
+      font-weight: 700;
+    }
+    .number-pad {
+      position: fixed;
+      right: 28px;
+      bottom: 28px;
+      display: grid;
+      grid-template-columns: repeat(3, 42px);
+      gap: 6px;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.45s ease 0.65s, transform 0.45s ease 0.65s;
+      pointer-events: none;
+    }
+    #game-hud.active .number-pad {
+      opacity: 1;
+      transform: none;
+      pointer-events: all;
+    }
+    #game-hud.exit .number-pad {
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .num-btn {
+      width: 42px;
+      height: 38px;
+      border: 1px solid var(--dimmer);
+      border-radius: 2px;
+      background: rgba(255,255,255,0.035);
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s, background 0.15s, transform 0.15s;
+    }
+    .num-btn:hover {
+      border-color: var(--dim);
+      background: rgba(255,255,255,0.08);
+      transform: translateY(-1px);
+    }
+    .num-btn.delete {
+      grid-column: 1 / -1;
+      width: auto;
+      color: var(--dim);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .solution-guide {
+      position: fixed;
+      left: 28px;
+      bottom: 28px;
+      width: 168px;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      pointer-events: none;
+    }
+    .solution-guide.show {
+      opacity: 1;
+      transform: none;
+    }
+    .guide-title {
+      margin-bottom: 8px;
+      color: var(--dim);
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    .guide-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 48px);
+      gap: 6px;
+    }
+    .guide-cell {
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--dimmer);
+      border-radius: 2px;
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .guide-cell.clue {
+      color: #07131f;
+      background: #1188d8;
+      border-color: #1188d8;
+    }
+    .complete-card {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.45s ease, transform 0.45s ease;
+      pointer-events: none;
+    }
+    #complete.active .complete-card {
+      opacity: 1;
+      transform: none;
+      pointer-events: all;
+    }
+    .complete-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(44px, 6vw, 76px);
+      letter-spacing: 0.08em;
+      text-align: center;
+    }
+    .complete-sub {
+      margin-top: 8px;
+      color: var(--dim);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+    .complete-check {
+      width: 48px;
+      height: 48px;
+      margin: 28px auto 0;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--accent);
+      border-radius: 50%;
+      background: transparent;
+      color: var(--accent);
+      font-size: 24px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, transform 0.15s;
+    }
+    .complete-check:hover {
+      background: var(--accent);
+      color: #07070f;
+      transform: translateY(-2px);
+    }
+
+    @media (max-width: 720px) {
+      .cube-controls {
+        transform: translateY(8px);
+      }
+      #game-hud.active .cube-controls {
+        transform: none;
+      }
+      .layer-row {
+        grid-template-columns: repeat(3, 54px);
+      }
+      .rotate-btn {
+        width: 40px;
+        height: 40px;
+      }
+      .number-pad {
+        right: 16px;
+        bottom: 92px;
+        grid-template-columns: repeat(3, 38px);
+      }
+      .num-btn {
+        width: 38px;
+        height: 34px;
+      }
+      .solution-guide {
+        left: 16px;
+        bottom: 92px;
+        width: 142px;
+      }
+      .guide-grid {
+        grid-template-columns: repeat(3, 40px);
+      }
+    }
+
+    /* ── SHARED ──────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 0 22px;
+      height: 42px;
+      border: none;
+      border-radius: 2px;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn:active { transform: scale(0.96) !important; }
+
+    .btn-solid {
+      background: var(--accent);
+      color: #07070f;
+      font-weight: 700;
+    }
+    .btn-solid:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(232,255,71,0.22); }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--dim);
+    }
+    .btn-outline:hover { transform: translateY(-2px); border-color: var(--text); }
+
+    .back-row {
+      display: flex;
+      justify-content: center;
+      margin-top: 28px;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.4s ease 0.18s, transform 0.4s ease 0.18s;
+    }
+    .back-btn {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.16);
+      color: rgba(255,255,255,0.58);
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      cursor: pointer;
+      padding: 8px 12px;
+      transition: color 0.15s, border-color 0.15s, background 0.15s, transform 0.15s;
+    }
+    .back-btn:hover {
+      background: rgba(255,255,255,0.07);
+      border-color: rgba(232,255,71,0.38);
+      color: var(--text);
+      transform: translateY(-1px);
+    }
+
+    /* stats row */
+    .stats-row {
+      display: flex;
+      gap: 24px;
+    }
+    .stat-n {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .stat-l {
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-top: 2px;
+    }
+
+    /* toast */
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(8px);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      color: var(--dim);
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      z-index: 200;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div class="feedback-pulse" id="feedback-pulse" aria-hidden="true"></div>
+<div class="toast" id="toast"></div>
+
+<!-- ── INTRO ─────────────────────────────────────── -->
+<div class="screen" id="intro">
+  <h1 class="intro-title">SUDOKUBE</h1>
+  <div class="cube-space"></div>
+  <div class="intro-bottom">
+    <div class="intro-actions">
+      <button class="btn btn-solid" id="btn-play">Play</button>
+      <button class="btn btn-outline" id="btn-choose">Select Puzzle</button>
+    </div>
+    <div class="stats-row">
+      <div>
+        <div class="stat-n" id="stat-played">0</div>
+        <div class="stat-l">Played</div>
+      </div>
+      <div>
+        <div class="stat-n" id="stat-completed">0</div>
+        <div class="stat-l">Completed</div>
+      </div>
+      <div>
+        <div class="stat-n" id="stat-remaining">500</div>
+        <div class="stat-l">Remaining</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SELECT ────────────────────────────────────── -->
+<div class="screen" id="select">
+  <div class="select-title">Select Puzzle</div>
+  <div class="option-list">
+    <div class="opt" id="opt-new">
+      <span class="opt-num">01</span>
+      <div class="opt-body">
+        <div class="opt-name">Random - New Only</div>
+        <div class="opt-desc">Picks from puzzles you haven't played</div>
+      </div>
+      <span class="opt-arrow">→</span>
+    </div>
+    <div class="opt" id="opt-any">
+      <span class="opt-num">02</span>
+      <div class="opt-body">
+        <div class="opt-name">Random - Any</div>
+        <div class="opt-desc">Fully random, including replays</div>
+      </div>
+      <span class="opt-arrow">→</span>
+    </div>
+    <div class="opt" id="opt-specific">
+      <span class="opt-num">03</span>
+      <div class="opt-body">
+        <div class="opt-name">Choose Specific</div>
+        <div class="opt-desc">Pick a puzzle by number</div>
+      </div>
+      <span class="opt-arrow">→</span>
+    </div>
+  </div>
+  <div class="back-row">
+    <button class="back-btn" id="back-from-select">← Back</button>
+  </div>
+</div>
+
+<!-- ── PICKER ────────────────────────────────────── -->
+<div class="screen" id="picker">
+  <div class="picker-title">Puzzle #</div>
+  <div class="picker-row">
+    <input type="number" id="puzzle-num-input" min="1" max="500" placeholder="001" />
+    <button class="btn btn-solid" id="btn-go">Go</button>
+  </div>
+  <div class="picker-sub">1 — 500</div>
+  <div class="back-row">
+    <button class="back-btn" id="back-from-picker">← Back</button>
+  </div>
+</div>
+
+<!-- ── GAME HUD ───────────────────────────────────── -->
+<div class="screen" id="game-hud">
+  <div class="hud-top">
+    <div>
+      <div class="hud-name">Sudokube</div>
+      <button class="back-btn" id="guide-toggle">Guide</button>
+      <div class="hud-id" id="hud-id">—</div>
+    </div>
+    <button class="back-btn" id="back-from-game">← Menu</button>
+  </div>
+  <div class="cube-controls" aria-label="Cube view controls">
+    <div class="view-pad" aria-label="Rotate cube">
+      <button class="view-btn rotate-btn" data-rotate="up" aria-label="Rotate up" title="Rotate up">↑</button>
+      <button class="view-btn rotate-btn" data-rotate="down" aria-label="Rotate down" title="Rotate down">↓</button>
+      <button class="view-btn rotate-btn" data-rotate="left" aria-label="Rotate left" title="Rotate left">←</button>
+      <button class="view-btn rotate-btn" data-rotate="right" aria-label="Rotate right" title="Rotate right">→</button>
+    </div>
+    <div class="control-group">
+      <div class="control-label">Layer</div>
+      <div class="layer-row">
+        <button class="view-btn active" data-depth="0">Outer</button>
+        <button class="view-btn" data-depth="1">Center</button>
+        <button class="view-btn" data-depth="2">Inner</button>
+      </div>
+    </div>
+  </div>
+  <div class="number-pad" aria-label="Number entry">
+    <button class="num-btn" data-entry="1">1</button>
+    <button class="num-btn" data-entry="2">2</button>
+    <button class="num-btn" data-entry="3">3</button>
+    <button class="num-btn" data-entry="4">4</button>
+    <button class="num-btn" data-entry="5">5</button>
+    <button class="num-btn" data-entry="6">6</button>
+    <button class="num-btn" data-entry="7">7</button>
+    <button class="num-btn" data-entry="8">8</button>
+    <button class="num-btn" data-entry="9">9</button>
+    <button class="num-btn delete" data-entry="delete">Delete</button>
+  </div>
+  <div class="solution-guide" id="solution-guide" aria-hidden="true">
+    <div class="guide-title" id="guide-title">Face Guide</div>
+    <div class="guide-grid" id="guide-grid"></div>
+  </div>
+</div>
+
+<div class="screen" id="complete">
+  <div class="complete-card">
+    <div>
+      <div class="complete-title" id="complete-title">Puzzle Complete</div>
+      <div class="complete-sub" id="complete-sub">Completed in 00:00</div>
+      <button class="complete-check" id="complete-ok" aria-label="Return to menu">✓</button>
+    </div>
+  </div>
+</div>
+
+<script src="./vendor/three.min.js"></script>
+<script src="./vendor/RoundedBoxGeometry.js"></script>
+
+<script type="module">
+import Storage from './storage.js';
+import PuzzleLoader from './puzzle-loader.js';
+import EASY from './easy-puzzles.js';
+
+PuzzleLoader.register('easy', EASY);
+
+// ── THREE SETUP ───────────────────────────────────
+const canvas   = document.getElementById('bg-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x07070f, 0);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+camera.position.set(0, 0.6, 7.2);
+camera.lookAt(0, 0, 0);
+let cubeGroup;
+let currentScreen = 'intro';
+
+function gameCubeScale() {
+  const fit = Math.min(window.innerWidth / 1050, window.innerHeight / 900);
+  return Math.max(0.78, Math.min(0.92, fit));
+}
+
+function syncCubeControls() {
+  if (!cubeGroup) return;
+  cubeGroup.updateMatrixWorld(true);
+  const extent = SPACING + 0.62;
+  const points = [];
+  [-extent, extent].forEach(x => {
+    [-extent, extent].forEach(y => {
+      [-extent, extent].forEach(z => {
+        const p = new THREE.Vector3(x, y, z).applyMatrix4(cubeGroup.matrixWorld).project(camera);
+        points.push({
+          x: (p.x * 0.5 + 0.5) * window.innerWidth,
+          y: (-p.y * 0.5 + 0.5) * window.innerHeight,
+        });
+      });
+    });
+  });
+  const minX = Math.min(...points.map(p => p.x));
+  const maxX = Math.max(...points.map(p => p.x));
+  const minY = Math.min(...points.map(p => p.y));
+  const maxY = Math.max(...points.map(p => p.y));
+  const size = Math.max(maxX - minX, maxY - minY) + 176;
+  document.documentElement.style.setProperty('--cube-screen-x', `${(minX + maxX) / 2}px`);
+  document.documentElement.style.setProperty('--cube-screen-y', `${(minY + maxY) / 2}px`);
+  document.documentElement.style.setProperty('--view-pad-size', `${size}px`);
+}
+
+function resize() {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  if (cubeGroup) {
+    cubeGroup.position.y = currentScreen === 'complete'
+      ? 7.8
+      : currentScreen === 'game-hud'
+        ? (window.innerHeight < 700 ? 0.14 : 0.26)
+        : (window.innerHeight < 700 ? 0.08 : 0.18);
+    cubeGroup.scale.setScalar(currentScreen === 'intro' ? 0.82 : currentScreen === 'game-hud' ? gameCubeScale() : 1);
+    syncCubeControls();
+  }
+}
+window.addEventListener('resize', resize);
+
+// Lighting — clean, even, slightly warm key
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const key = new THREE.DirectionalLight(0xffffff, 1.0);
+key.position.set(5, 8, 8);
+scene.add(key);
+const fill = new THREE.DirectionalLight(0xaaaaff, 0.3);
+fill.position.set(-6, -4, -6);
+scene.add(fill);
+const rim = new THREE.DirectionalLight(0xe8ff47, 0.18);
+rim.position.set(0, -8, -4);
+scene.add(rim);
+
+// ── CUBE CELLS ────────────────────────────────────
+const SPACING = 1.05;   // tight
+const TOUCH_SPACING = 0.9;
+const GEO     = new THREE.RoundedBoxGeometry(0.9, 0.9, 0.9, 4, 0.06);
+const INTRO_EDGE_GEO = new THREE.EdgesGeometry(GEO, 24);
+const INTRO_EDGE_MAT = new THREE.LineBasicMaterial({
+  color: 0x050509,
+  transparent: true,
+  opacity: 0.58,
+});
+const INTRO_COLOR = 0xf4f7ff;
+const EMPTY_COLOR = 0x20242c;
+const CLUE_COLOR = 0x1188d8;
+const CONFLICT_COLOR = 0xd83a3a;
+const COMPLETE_COLOR = 0x2fb865;
+const SELECT_EMISSIVE = 0x2f3a18;
+const CONFLICT_SELECT_EMISSIVE = 0x180202;
+
+// Intro cube palette — restrained so the start screen stays calm.
+const VALUE_COLORS = [
+  0x20242c,
+  0x2d3440,
+  0x3a4450,
+  0x20242c,
+  0xe8ff47,
+  0x3a4450,
+  0x20242c,
+  0x2d3440,
+  0x3a4450,
+];
+
+const DIGIT_TEXTURES = new Map();
+
+function makeTextTexture(value, ink = 'dark', size = 132) {
+  const key = `${ink}:${size}:${value}`;
+  if (DIGIT_TEXTURES.has(key)) return DIGIT_TEXTURES.get(key);
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 256;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.fillStyle = ink === 'light' ? '#f2f6ff' : '#07070f';
+  ctx.font = `700 ${size}px Space Mono, monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(value), 128, 128);
+  const tex = new THREE.CanvasTexture(c);
+  DIGIT_TEXTURES.set(key, tex);
+  return tex;
+}
+
+function makeDigitTexture(value, ink = 'dark') {
+  return makeTextTexture(value, ink, 132);
+}
+
+function setCellFace(mesh, value, isClue) {
+  mesh.userData.introLetters?.forEach(plane => { plane.visible = false; });
+  if (mesh.userData.introEdge) mesh.userData.introEdge.visible = false;
+  mesh.userData.clueValue = isClue ? value : 0;
+  mesh.userData.entryValue = 0;
+  mesh.userData.entryConflict = false;
+  mesh.userData.completed = false;
+  mesh.userData.shakeStart = 0;
+  mesh.material.map = null;
+  mesh.material.emissive?.set(0x000000);
+  if (!isClue) {
+    mesh.material.color.set(EMPTY_COLOR);
+    mesh.material.needsUpdate = true;
+    return;
+  }
+  mesh.material.color.set(CLUE_COLOR);
+  mesh.material.needsUpdate = true;
+}
+
+function clearCellFace(mesh, color) {
+  mesh.userData.clueValue = 0;
+  mesh.userData.entryValue = 0;
+  mesh.userData.entryConflict = false;
+  mesh.userData.completed = false;
+  mesh.userData.shakeStart = 0;
+  if (mesh.userData.digit) {
+    mesh.userData.digit.visible = false;
+    mesh.userData.digit.material.map = null;
+    mesh.userData.digit.userData.value = 0;
+  }
+  mesh.material.map = null;
+  mesh.material.color.set(color);
+  mesh.material.emissive?.set(0x000000);
+  mesh.material.needsUpdate = true;
+}
+
+function makeDigitPlane() {
+  const mat = new THREE.MeshBasicMaterial({
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.48, 0.48), mat);
+  plane.renderOrder = 20;
+  plane.visible = false;
+  return plane;
+}
+
+function makeIntroLetterPlane(letter, face) {
+  const mat = new THREE.MeshBasicMaterial({
+    map: makeTextTexture(letter, 'dark', 118),
+    transparent: true,
+    depthTest: true,
+    depthWrite: false,
+    side: THREE.FrontSide,
+  });
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.44), mat);
+  const normal = FACE_VECTORS[face];
+  plane.position.copy(normal.clone().multiplyScalar(0.472));
+  plane.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal));
+  plane.renderOrder = 30;
+  return plane;
+}
+
+
+// Use a solved grid so the cube looks like a real filled puzzle
+// Hand-crafted valid 3x3x3 solution (each axis-plane has 1-9 once)
+const SOLUTION = [
+  // grid[x][y][z]
+  [[1,2,3],[4,5,6],[7,8,9]],
+  [[4,5,6],[7,8,9],[1,2,3]],
+  [[7,8,9],[1,2,3],[4,5,6]],
+];
+let currentSolution = SOLUTION;
+
+cubeGroup = new THREE.Group();
+scene.add(cubeGroup);
+const cellMeshes = [];
+resize();
+
+for (let z = 0; z < 3; z++) {
+  for (let y = 0; y < 3; y++) {
+    for (let x = 0; x < 3; x++) {
+      const val = SOLUTION[x][y][z];
+      const mat = new THREE.MeshStandardMaterial({
+        color: VALUE_COLORS[val - 1],
+        roughness: 0.45,
+        metalness: 0.08,
+      });
+      const mesh = new THREE.Mesh(GEO, mat);
+      mesh.position.set((x-1)*SPACING, (y-1)*SPACING, (z-1)*SPACING);
+      mesh.userData = { x, y, z, val };
+      const digit = makeDigitPlane();
+      mesh.add(digit);
+      mesh.userData.digit = digit;
+      const introEdge = new THREE.LineSegments(INTRO_EDGE_GEO, INTRO_EDGE_MAT);
+      introEdge.visible = false;
+      mesh.add(introEdge);
+      mesh.userData.introEdge = introEdge;
+      cubeGroup.add(mesh);
+      cellMeshes.push(mesh);
+    }
+  }
+}
+
+// ── SPIN STATE ────────────────────────────────────
+function forEachCell(fn) {
+  let i = 0;
+  for (let z = 0; z < 3; z++) {
+    for (let y = 0; y < 3; y++) {
+      for (let x = 0; x < 3; x++) {
+        fn(cellMeshes[i], x, y, z, i++);
+      }
+    }
+  }
+}
+
+const SPIN_SPEED = 0.0026; // radians/frame — slow
+
+// ── SCREEN STATE ──────────────────────────────────
+const FACE_VIEWS = {
+  front:  { axis: 'z', near: 2 },
+  back:   { axis: 'z', near: 0 },
+  left:   { axis: 'x', near: 0 },
+  right:  { axis: 'x', near: 2 },
+  top:    { axis: 'y', near: 2 },
+  bottom: { axis: 'y', near: 0 },
+};
+let activeFace = 'front';
+let activeTopFace = 'top';
+let activeDepth = 0;
+let selectedCell = null;
+let completedPlanes = new Set();
+let guideVisible = false;
+let currentPuzzleId = null;
+let puzzleStartTime = 0;
+let completionStarted = false;
+const targetQuaternion = new THREE.Quaternion();
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+const guideEl = document.getElementById('solution-guide');
+const guideTitle = document.getElementById('guide-title');
+const guideGrid = document.getElementById('guide-grid');
+const feedbackPulseEl = document.getElementById('feedback-pulse');
+let audioCtx = null;
+let soundEnabled = true;
+
+function ensureAudio() {
+  if (!soundEnabled) return null;
+  audioCtx ||= new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playTone({ freq = 440, endFreq = freq, start = 0, duration = 0.12, type = 'sine', volume = 0.12 }) {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  const t = ctx.currentTime + start;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(1, endFreq), t + duration);
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(volume, t + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t);
+  osc.stop(t + duration + 0.03);
+}
+
+function playNoise({ start = 0, duration = 0.12, volume = 0.08, cutoff = 900 }) {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  const t = ctx.currentTime + start;
+  const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * duration), ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+  const noise = ctx.createBufferSource();
+  const filter = ctx.createBiquadFilter();
+  const gain = ctx.createGain();
+  noise.buffer = buffer;
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(cutoff, t);
+  gain.gain.setValueAtTime(volume, t);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+  noise.connect(filter).connect(gain).connect(ctx.destination);
+  noise.start(t);
+}
+
+function playSound(name) {
+  if (!soundEnabled) return;
+  if (name === 'tap') playTone({ freq: 560, endFreq: 760, duration: 0.055, type: 'triangle', volume: 0.055 });
+  if (name === 'select') playTone({ freq: 1040, endFreq: 980, duration: 0.035, type: 'sine', volume: 0.018 });
+  if (name === 'entry') {
+    playTone({ freq: 680, endFreq: 620, duration: 0.045, type: 'sine', volume: 0.035 });
+    playTone({ freq: 920, endFreq: 860, start: 0.025, duration: 0.055, type: 'triangle', volume: 0.025 });
+  }
+  if (name === 'move') playTone({ freq: 240, endFreq: 420, duration: 0.09, type: 'sine', volume: 0.045 });
+  if (name === 'delete') playTone({ freq: 220, endFreq: 150, duration: 0.09, type: 'sawtooth', volume: 0.045 });
+  if (name === 'wrong') {
+    playTone({ freq: 120, endFreq: 72, duration: 0.18, type: 'sawtooth', volume: 0.075 });
+    playNoise({ duration: 0.11, volume: 0.045, cutoff: 520 });
+  }
+  if (name === 'face') {
+    playTone({ freq: 392, endFreq: 392, duration: 0.12, type: 'sine', volume: 0.07 });
+    playTone({ freq: 587, endFreq: 587, start: 0.075, duration: 0.14, type: 'sine', volume: 0.065 });
+    playTone({ freq: 784, endFreq: 784, start: 0.16, duration: 0.18, type: 'triangle', volume: 0.055 });
+  }
+  if (name === 'complete') {
+    playTone({ freq: 262, endFreq: 262, duration: 0.18, type: 'sine', volume: 0.075 });
+    playTone({ freq: 392, endFreq: 392, start: 0.1, duration: 0.22, type: 'sine', volume: 0.075 });
+    playTone({ freq: 523, endFreq: 659, start: 0.22, duration: 0.34, type: 'triangle', volume: 0.095 });
+    playNoise({ start: 0.28, duration: 0.32, volume: 0.035, cutoff: 2600 });
+  }
+}
+
+function pulseFeedback(kind) {
+  const settings = {
+    wrong: { rgb: '216,58,58', core: 0.34, mid: 0.16, duration: '540ms' },
+    face: { rgb: '47,184,101', core: 0.28, mid: 0.14, duration: '460ms' },
+    complete: { rgb: '255,209,64', core: 0.78, mid: 0.38, duration: '1100ms' },
+  }[kind];
+  if (!settings) return;
+
+  feedbackPulseEl.classList.remove('pulse');
+  feedbackPulseEl.classList.toggle('pulse-complete', kind === 'complete');
+  feedbackPulseEl.style.setProperty('--pulse-rgb', settings.rgb);
+  feedbackPulseEl.style.setProperty('--pulse-core-alpha', settings.core);
+  feedbackPulseEl.style.setProperty('--pulse-mid-alpha', settings.mid);
+  feedbackPulseEl.style.setProperty('--pulse-duration', settings.duration);
+  void feedbackPulseEl.offsetWidth;
+  feedbackPulseEl.classList.add('pulse');
+}
+const FACE_VECTORS = {
+  front:  new THREE.Vector3(0, 0, 1),
+  back:   new THREE.Vector3(0, 0, -1),
+  left:   new THREE.Vector3(-1, 0, 0),
+  right:  new THREE.Vector3(1, 0, 0),
+  top:    new THREE.Vector3(0, 1, 0),
+  bottom: new THREE.Vector3(0, -1, 0),
+};
+const OPPOSITE_FACE = {
+  front: 'back',
+  back: 'front',
+  left: 'right',
+  right: 'left',
+  top: 'bottom',
+  bottom: 'top',
+};
+const INTRO_LETTERS = [
+  { letter: 'S', face: 'front', x: 0, y: 2, z: 2 },
+  { letter: 'U', face: 'front', x: 1, y: 2, z: 2 },
+  { letter: 'D', face: 'front', x: 2, y: 2, z: 2 },
+  { letter: 'O', face: 'front', x: 0, y: 1, z: 2 },
+  { letter: 'K', face: 'front', x: 1, y: 1, z: 2 },
+  { letter: 'U', face: 'front', x: 2, y: 1, z: 2 },
+  { letter: 'B', face: 'front', x: 0, y: 0, z: 2 },
+  { letter: 'E', face: 'front', x: 1, y: 0, z: 2 },
+  { letter: 'S', face: 'back',  x: 2, y: 2, z: 0 },
+  { letter: 'U', face: 'back',  x: 1, y: 2, z: 0 },
+  { letter: 'D', face: 'back',  x: 0, y: 2, z: 0 },
+  { letter: 'O', face: 'back',  x: 2, y: 1, z: 0 },
+  { letter: 'K', face: 'back',  x: 1, y: 1, z: 0 },
+  { letter: 'U', face: 'back',  x: 0, y: 1, z: 0 },
+  { letter: 'B', face: 'back',  x: 2, y: 0, z: 0 },
+  { letter: 'E', face: 'back',  x: 1, y: 0, z: 0 },
+];
+
+function setupIntroLetters() {
+  INTRO_LETTERS.forEach(({ letter, face, x, y, z }) => {
+    const mesh = cellMeshes.find(cell => cell.userData.x === x && cell.userData.y === y && cell.userData.z === z);
+    if (!mesh) return;
+    const plane = makeIntroLetterPlane(letter, face);
+    mesh.add(plane);
+    if (!mesh.userData.introLetters) mesh.userData.introLetters = [];
+    mesh.userData.introLetters.push(plane);
+  });
+}
+
+function setIntroLettersVisible(visible) {
+  cellMeshes.forEach(mesh => {
+    mesh.userData.introLetters?.forEach(plane => { plane.visible = visible; });
+  });
+}
+
+function setIntroEdgesVisible(visible) {
+  cellMeshes.forEach(mesh => {
+    if (mesh.userData.introEdge) mesh.userData.introEdge.visible = visible;
+  });
+}
+function faceFromVector(vec) {
+  return Object.entries(FACE_VECTORS).find(([, faceVec]) => faceVec.equals(vec))?.[0] || activeFace;
+}
+
+function updateDigitFaces() {
+  const localNormal = FACE_VECTORS[activeFace];
+  const offset = localNormal.clone().multiplyScalar(0.47);
+  const cubeQuat = cubeGroup.quaternion;
+  const cubeQuatInv = cubeQuat.clone().invert();
+  const worldNormal = localNormal.clone().applyQuaternion(cubeQuat).normalize();
+  let worldUp = new THREE.Vector3(0, 1, 0).projectOnPlane(worldNormal);
+  if (worldUp.lengthSq() < 0.001) {
+    worldUp = FACE_VECTORS[activeTopFace].clone().applyQuaternion(cubeQuat).projectOnPlane(worldNormal);
+  }
+  worldUp.normalize();
+  const worldRight = new THREE.Vector3().crossVectors(worldUp, worldNormal).normalize();
+  const worldQuat = new THREE.Quaternion().setFromRotationMatrix(
+    new THREE.Matrix4().makeBasis(worldRight, worldUp, worldNormal)
+  );
+  const localQuat = cubeQuatInv.multiply(worldQuat);
+  cellMeshes.forEach(mesh => {
+    const digit = mesh.userData.digit;
+    if (!digit) return;
+    digit.position.copy(offset);
+    digit.quaternion.copy(localQuat);
+    const displayValue = mesh.userData.clueValue || mesh.userData.entryValue || 0;
+    const ink = mesh.userData.clueValue ? 'dark' : 'light';
+    if (displayValue) {
+      if (digit.userData.value !== displayValue || digit.userData.ink !== ink) {
+        digit.material.map = makeDigitTexture(displayValue, ink);
+        digit.material.needsUpdate = true;
+        digit.userData.value = displayValue;
+        digit.userData.ink = ink;
+      }
+    } else {
+      digit.userData.value = 0;
+      digit.userData.ink = '';
+    }
+  });
+}
+
+function updateTargetOrientation() {
+  const front = FACE_VECTORS[activeFace];
+  const up = FACE_VECTORS[activeTopFace];
+  const right = new THREE.Vector3().crossVectors(up, front);
+  const basis = new THREE.Matrix4().makeBasis(right, up, front).invert();
+  targetQuaternion.setFromRotationMatrix(basis);
+}
+updateTargetOrientation();
+
+function layerCoord(face, depth) {
+  const near = FACE_VIEWS[face].near;
+  return near === 2 ? 2 - depth : depth;
+}
+
+function depthFromFace(face, coord) {
+  const near = FACE_VIEWS[face].near;
+  return near === 2 ? 2 - coord : coord;
+}
+
+function updateViewButtons() {
+  document.querySelectorAll('[data-depth]').forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.depth) === activeDepth);
+  });
+}
+
+function applyPlaneVisibility() {
+  const view = FACE_VIEWS[activeFace];
+  const selected = layerCoord(activeFace, activeDepth);
+  cellMeshes.forEach(mesh => {
+    const coord = mesh.userData[view.axis];
+    const depth = depthFromFace(activeFace, coord);
+    const isSelected = coord === selected;
+    const isBehindOrSelected = depth >= activeDepth;
+    mesh.visible = isBehindOrSelected;
+    if (mesh.userData.entryConflict) mesh.material.color.set(CONFLICT_COLOR);
+    else if (mesh.userData.completed) mesh.material.color.set(COMPLETE_COLOR);
+    else if (mesh.userData.clueValue) mesh.material.color.set(CLUE_COLOR);
+    else mesh.material.color.set(EMPTY_COLOR);
+    mesh.material.transparent = !isSelected;
+    mesh.material.depthWrite = isSelected;
+    mesh.material.opacity = isSelected ? 1 : 0.34;
+    const isSelectedCell = mesh === selectedCell && isSelected;
+    const glow = isSelectedCell
+      ? (mesh.userData.entryConflict ? CONFLICT_SELECT_EMISSIVE : SELECT_EMISSIVE)
+      : 0x000000;
+    mesh.material.emissive?.set(glow);
+    mesh.scale.setScalar(isSelected ? 1 : 0.82);
+    if (mesh.userData.digit) {
+      mesh.userData.digit.visible = isSelected && !!(mesh.userData.clueValue || mesh.userData.entryValue);
+    }
+  });
+  if (selectedCell && !selectedCell.visible) selectedCell = null;
+}
+
+function updateEntryConflicts() {
+  cellMeshes.forEach(mesh => { mesh.userData.entryConflict = false; });
+
+  ['x', 'y', 'z'].forEach(axis => {
+    for (let plane = 0; plane < 3; plane++) {
+      const buckets = new Map();
+      cellMeshes
+        .filter(mesh => mesh.userData[axis] === plane)
+        .forEach(mesh => {
+          const value = mesh.userData.clueValue || mesh.userData.entryValue || 0;
+          if (!value) return;
+          if (!buckets.has(value)) buckets.set(value, []);
+          buckets.get(value).push(mesh);
+        });
+
+      buckets.forEach(matches => {
+        if (matches.length < 2) return;
+        matches.forEach(mesh => {
+          if (!mesh.userData.clueValue) mesh.userData.entryConflict = true;
+        });
+      });
+    }
+  });
+}
+
+function planeKey(axis, plane) {
+  return `${axis}:${plane}`;
+}
+
+function cellValue(mesh) {
+  return mesh.userData.clueValue || mesh.userData.entryValue || 0;
+}
+
+function solutionValue(mesh) {
+  return currentSolution[mesh.userData.x][mesh.userData.y][mesh.userData.z];
+}
+
+function isPlaneSolved(axis, plane) {
+  return cellMeshes
+    .filter(mesh => mesh.userData[axis] === plane)
+    .every(mesh => cellValue(mesh) === solutionValue(mesh));
+}
+
+function hasCompletedNeighbor(mesh, dim) {
+  return cellMeshes.some(other => {
+    if (other === mesh || !other.userData.completed) return false;
+    if (Math.abs(other.userData[dim] - mesh.userData[dim]) !== 1) return false;
+    return ['x', 'y', 'z'].every(axis => axis === dim || other.userData[axis] === mesh.userData[axis]);
+  });
+}
+
+function completedPlaneTouches(mesh, dim) {
+  return [...completedPlanes].some(key => {
+    const [axis, planeValue] = key.split(':');
+    return axis !== dim && mesh.userData[axis] === Number(planeValue);
+  });
+}
+
+function completedCoordShouldTouch(dim, coord) {
+  return cellMeshes.some(mesh => {
+    if (!mesh.userData.completed || mesh.userData[dim] !== coord) return false;
+    return completedPlaneTouches(mesh, dim) || hasCompletedNeighbor(mesh, dim);
+  });
+}
+
+function completedTargetFor(mesh) {
+  const target = new THREE.Vector3();
+  ['x', 'y', 'z'].forEach(dim => {
+    const shouldTouch = completedCoordShouldTouch(dim, mesh.userData[dim]);
+    const spacing = shouldTouch ? TOUCH_SPACING : SPACING;
+    target[dim] = (mesh.userData[dim] - 1) * spacing;
+  });
+  return target;
+}
+
+function updateCompletedPlanes() {
+  const solvedNow = new Set();
+  ['x', 'y', 'z'].forEach(axis => {
+    for (let plane = 0; plane < 3; plane++) {
+      if (isPlaneSolved(axis, plane)) solvedNow.add(planeKey(axis, plane));
+    }
+  });
+
+  const newlyCompleted = [...solvedNow].filter(key => !completedPlanes.has(key));
+  newlyCompleted.forEach(key => {
+    const [axis, planeValue] = key.split(':');
+    const plane = Number(planeValue);
+    const planeCells = cellMeshes.filter(mesh => mesh.userData[axis] === plane);
+    planeCells.forEach(mesh => {
+      const wasAlreadyLocked = mesh.userData.completed;
+      mesh.userData.completed = true;
+      if (wasAlreadyLocked) return;
+
+      mesh.userData.targetHomePos.copy(mesh.userData.baseHomePos);
+    });
+  });
+
+  newlyCompleted.forEach(key => completedPlanes.add(key));
+  const wholeCubeSolved = completedPlanes.size === 9;
+
+  if (wholeCubeSolved) {
+    cellMeshes.forEach(mesh => {
+      mesh.userData.completed = true;
+      mesh.userData.targetHomePos.set(
+        (mesh.userData.x - 1) * TOUCH_SPACING,
+        (mesh.userData.y - 1) * TOUCH_SPACING,
+        (mesh.userData.z - 1) * TOUCH_SPACING
+      );
+    });
+  } else if (newlyCompleted.length) {
+    cellMeshes.forEach(mesh => {
+      if (mesh.userData.completed) mesh.userData.targetHomePos.copy(completedTargetFor(mesh));
+    });
+    playSound('face');
+    pulseFeedback('face');
+  }
+
+  if (wholeCubeSolved && currentScreen === 'game-hud' && !completionStarted) {
+    completionStarted = true;
+    playSound('complete');
+    pulseFeedback('complete');
+    setTimeout(completePuzzleAnimation, 420);
+  }
+}
+
+function updateCompletedMotion() {
+  cellMeshes.forEach(mesh => {
+    if (!mesh.userData.targetHomePos) return;
+    mesh.userData.homePos.lerp(mesh.userData.targetHomePos, 0.12);
+    if (!mesh.userData.shakeStart) mesh.position.copy(mesh.userData.homePos);
+  });
+}
+
+function startConflictShake(mesh) {
+  mesh.userData.shakeStart = performance.now();
+}
+
+function updateConflictShakes(now) {
+  const right = new THREE.Vector3()
+    .crossVectors(FACE_VECTORS[activeTopFace], FACE_VECTORS[activeFace])
+    .normalize();
+
+  cellMeshes.forEach(mesh => {
+    const start = mesh.userData.shakeStart || 0;
+    if (!start) return;
+
+    const elapsed = now - start;
+    const duration = 280;
+    if (elapsed >= duration) {
+      mesh.userData.shakeStart = 0;
+      mesh.position.copy(mesh.userData.homePos);
+      return;
+    }
+
+    const t = elapsed / duration;
+    const wobble = Math.sin(t * Math.PI * 8) * (1 - t) * 0.055;
+    mesh.position.copy(mesh.userData.homePos).addScaledVector(right, wobble);
+  });
+}
+
+function showAllPlanes() {
+  cellMeshes.forEach(mesh => {
+    mesh.visible = true;
+    mesh.material.transparent = false;
+    mesh.material.depthWrite = true;
+    mesh.material.opacity = 1;
+    mesh.material.emissive?.set(0x000000);
+    mesh.scale.setScalar(1);
+    if (mesh.userData.digit) mesh.userData.digit.visible = false;
+  });
+  selectedCell = null;
+}
+
+function showIntroCube(snap = true) {
+  completedPlanes = new Set();
+  forEachCell((mesh, x, y, z) => {
+    const introPos = new THREE.Vector3(
+      (x - 1) * TOUCH_SPACING,
+      (y - 1) * TOUCH_SPACING,
+      (z - 1) * TOUCH_SPACING
+    );
+    mesh.userData.homePos.copy(introPos);
+    mesh.userData.targetHomePos.copy(introPos);
+    if (snap) mesh.position.copy(introPos);
+    clearCellFace(mesh, INTRO_COLOR);
+  });
+  setIntroLettersVisible(true);
+  setIntroEdgesVisible(true);
+  showAllPlanes();
+}
+
+function showCompletedShape() {
+  setIntroLettersVisible(false);
+  setIntroEdgesVisible(false);
+  cellMeshes.forEach(mesh => {
+    mesh.visible = true;
+    mesh.material.color.set(COMPLETE_COLOR);
+    mesh.material.transparent = false;
+    mesh.material.depthWrite = true;
+    mesh.material.opacity = 1;
+    mesh.material.emissive?.set(0x000000);
+    mesh.scale.setScalar(1);
+    mesh.position.copy(mesh.userData.homePos);
+    if (mesh.userData.digit) mesh.userData.digit.visible = false;
+  });
+}
+
+function resetCubeView(depth = 0, instant = false) {
+  activeFace = 'front';
+  activeTopFace = 'top';
+  activeDepth = depth;
+  selectedCell = null;
+  updateTargetOrientation();
+  updateDigitFaces();
+  if (instant) cubeGroup.quaternion.copy(targetQuaternion);
+  updateViewButtons();
+  applyPlaneVisibility();
+}
+
+function setLayer(depth) {
+  playSound('move');
+  activeDepth = depth;
+  selectedCell = null;
+  updateDigitFaces();
+  updateViewButtons();
+  applyPlaneVisibility();
+  renderGuide();
+}
+
+function rotateCube(direction) {
+  playSound('move');
+  selectedCell = null;
+  const front = activeFace;
+  const up = activeTopFace;
+  const right = faceFromVector(new THREE.Vector3().crossVectors(FACE_VECTORS[up], FACE_VECTORS[front]));
+
+  if (direction === 'left') activeFace = OPPOSITE_FACE[right];
+  if (direction === 'right') activeFace = right;
+  if (direction === 'up') {
+    activeFace = up;
+    activeTopFace = OPPOSITE_FACE[front];
+  }
+  if (direction === 'down') {
+    activeFace = OPPOSITE_FACE[up];
+    activeTopFace = front;
+  }
+  updateTargetOrientation();
+  updateDigitFaces();
+  updateViewButtons();
+  applyPlaneVisibility();
+  renderGuide();
+}
+
+document.querySelectorAll('[data-rotate]').forEach(btn => {
+  btn.addEventListener('click', () => rotateCube(btn.dataset.rotate));
+});
+
+document.querySelectorAll('[data-depth]').forEach(btn => {
+  btn.addEventListener('click', () => setLayer(Number(btn.dataset.depth)));
+});
+
+function isFocusedEditableCell(mesh) {
+  if (!mesh || mesh.userData.clueValue || mesh.userData.completed) return false;
+  const view = FACE_VIEWS[activeFace];
+  return depthFromFace(activeFace, mesh.userData[view.axis]) === activeDepth;
+}
+
+function setSelectedCell(mesh) {
+  selectedCell = isFocusedEditableCell(mesh) ? mesh : null;
+  if (selectedCell) playSound('select');
+  applyPlaneVisibility();
+}
+
+function setSelectedEntry(value) {
+  if (!selectedCell) {
+    showToast('Select an empty cell');
+    return;
+  }
+  const entryCell = selectedCell;
+  const previousValue = entryCell.userData.entryValue;
+  entryCell.userData.entryValue = value;
+  if (value && previousValue && previousValue !== value) playSound('entry');
+  if (!value && previousValue) playSound('delete');
+  updateEntryConflicts();
+  updateCompletedPlanes();
+  if (value && entryCell.userData.entryConflict) {
+    startConflictShake(entryCell);
+    playSound('wrong');
+    pulseFeedback('wrong');
+  }
+  if (entryCell.userData.completed) selectedCell = null;
+  updateDigitFaces();
+  applyPlaneVisibility();
+}
+
+function renderGuide() {
+  if (!guideVisible) return;
+  const view = FACE_VIEWS[activeFace];
+  const selected = layerCoord(activeFace, activeDepth);
+  const projected = cellMeshes
+    .filter(mesh => mesh.userData[view.axis] === selected)
+    .map(mesh => {
+      const pos = new THREE.Vector3();
+      mesh.getWorldPosition(pos);
+      const screen = pos.clone().project(camera);
+      return { mesh, sx: screen.x, sy: screen.y };
+    })
+    .sort((a, b) => b.sy - a.sy);
+
+  const cells = [];
+  for (let row = 0; row < 3; row++) {
+    cells.push(...projected.slice(row * 3, row * 3 + 3).sort((a, b) => a.sx - b.sx));
+  }
+
+  guideTitle.textContent = `${activeFace} ${['outer', 'center', 'inner'][activeDepth]}`;
+  guideGrid.innerHTML = cells.map(({ mesh }) => {
+    const value = solutionValue(mesh);
+    const clue = mesh.userData.clueValue ? ' clue' : '';
+    return `<div class="guide-cell${clue}">${value}</div>`;
+  }).join('');
+}
+
+document.getElementById('guide-toggle').addEventListener('click', () => {
+  guideVisible = !guideVisible;
+  guideEl.classList.toggle('show', guideVisible);
+  guideEl.setAttribute('aria-hidden', String(!guideVisible));
+  renderGuide();
+});
+
+document.getElementById('game-hud').addEventListener('pointerdown', e => {
+  if (e.target.closest('button')) return;
+  if (currentScreen !== 'game-hud' || animating) return;
+  pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+  pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const candidates = cellMeshes.filter(isFocusedEditableCell);
+  const hit = raycaster.intersectObjects(candidates, false)[0];
+  setSelectedCell(hit?.object || null);
+});
+
+document.querySelectorAll('[data-entry]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const entry = btn.dataset.entry;
+    setSelectedEntry(entry === 'delete' ? 0 : Number(entry));
+  });
+});
+
+document.getElementById('complete-ok').addEventListener('click', () => {
+  showIntroCube();
+  cubeGroup.position.y = window.innerHeight < 700 ? 0.08 : 0.18;
+  cubeGroup.quaternion.identity();
+  cubeGroup.rotation.set(0, 0, 0);
+  completionStarted = false;
+  goTo('intro');
+});
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    navigateBack();
+    return;
+  }
+  if (currentScreen !== 'game-hud') return;
+  if (/^[1-9]$/.test(e.key)) setSelectedEntry(Number(e.key));
+  if (e.key === 'Backspace' || e.key === 'Delete') setSelectedEntry(0);
+});
+
+function navigateBack() {
+  if (currentScreen === 'select') {
+    goTo('intro');
+    return;
+  }
+  if (currentScreen === 'picker') {
+    goTo('select');
+    return;
+  }
+  if (currentScreen === 'complete') {
+    document.getElementById('complete-ok').click();
+    return;
+  }
+  if (currentScreen === 'game-hud') {
+    document.getElementById('back-from-game').click();
+  }
+}
+
+function goTo(name) {
+  const prev = document.getElementById(currentScreen);
+  prev.classList.remove('active');
+  prev.classList.add('exit');
+  setTimeout(() => prev.classList.remove('exit'), 400);
+
+  currentScreen = name;
+  resize();
+  syncCubeControls();
+  const next = document.getElementById(name);
+  setTimeout(() => next.classList.add('active'), 30);
+}
+
+// Start intro
+requestAnimationFrame(() => {
+  document.getElementById('intro').classList.add('active');
+});
+
+// ── EXPLODE / REASSEMBLE ──────────────────────────
+// Compute explode targets per cell (outward from center)
+cellMeshes.forEach(mesh => {
+  const home = mesh.position.clone();
+  const dir  = home.clone().normalize();
+  if (dir.length() < 0.01) dir.set(0, 1, 0); // center cell fallback
+  mesh.userData.homePos    = home;
+  mesh.userData.baseHomePos = home.clone();
+  mesh.userData.targetHomePos = home.clone();
+  mesh.userData.explodePos = dir.multiplyScalar(5.5 + Math.random() * 1.2);
+});
+setupIntroLetters();
+showIntroCube();
+
+let animating = false;
+
+function easeInCubic(t) { return t * t * t; }
+function easeOutBack(t, amount = 0.45) {
+  const c1 = amount, c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t-1, 3) + c1 * Math.pow(t-1, 2);
+}
+
+function explodeThenReassemble(onMidpoint) {
+  if (animating) return;
+  animating = true;
+  const EXPLODE_MS  = 480;
+  const PAUSE_MS    = 60;
+  const ASSEMBLE_MS = 620;
+
+  // Snapshot current positions.
+  const startPos = cellMeshes.map(m => m.position.clone());
+
+  let phase = 'explode', phaseStart = null;
+
+  function tick(now) {
+    if (!phaseStart) phaseStart = now;
+    const t = Math.min((now - phaseStart) / (
+      phase === 'explode'  ? EXPLODE_MS :
+      phase === 'pause'    ? PAUSE_MS   : ASSEMBLE_MS
+    ), 1);
+
+    if (phase === 'explode') {
+      const e = easeInCubic(t);
+      cellMeshes.forEach((m, i) => {
+        m.position.lerpVectors(startPos[i], m.userData.explodePos, e);
+        m.material.opacity = Math.max(0, 1 - e * 1.3);
+        m.material.transparent = true;
+      });
+      if (t >= 1) { phase = 'pause'; phaseStart = now; onMidpoint(); }
+
+    } else if (phase === 'pause') {
+      if (t >= 1) { phase = 'assemble'; phaseStart = now; }
+
+    } else {
+      // stagger by manhattan distance from center
+      cellMeshes.forEach(m => {
+        const md   = Math.abs(m.userData.x-1) + Math.abs(m.userData.y-1) + Math.abs(m.userData.z-1);
+        const delay = md * 0.055;
+        const lt    = Math.max(0, Math.min((t - delay) / (1 - delay * 0.4), 1));
+        const e     = easeOutBack(lt);
+        m.position.lerpVectors(m.userData.explodePos, m.userData.homePos, e);
+        m.material.opacity = Math.min(lt * 1.8, 1);
+        m.scale.setScalar(Math.min(e, 1.0));
+      });
+      if (t >= 1) {
+        cellMeshes.forEach(m => {
+          m.position.copy(m.userData.homePos);
+          m.material.opacity = 1;
+          m.material.transparent = false;
+          m.scale.setScalar(1);
+        });
+        animating = false;
+        return;
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+// ── RENDER LOOP ───────────────────────────────────
+function dropIntroCubeFromTop(onDone) {
+  if (animating) return;
+  animating = true;
+  cubeGroup.quaternion.identity();
+  cubeGroup.rotation.set(0, 0, 0);
+
+  const CLEAR_MS = 260;
+  const DROP_MS = 980;
+  const clearStart = cellMeshes.map(mesh => mesh.position.clone());
+  let phase = 'clear';
+  let phaseStart = null;
+  let endPositions = [];
+  let dropPositions = [];
+
+  function prepareIntroDrop() {
+    currentScreen = 'intro';
+    resize();
+    document.getElementById('game-hud').classList.remove('active');
+    document.getElementById('intro').classList.add('active');
+    showIntroCube(false);
+    endPositions = cellMeshes.map(mesh => mesh.userData.homePos.clone());
+    dropPositions = endPositions.map((pos, i) => {
+      const mesh = cellMeshes[i];
+      return pos.clone().add(new THREE.Vector3(
+        0,
+        5.8 + mesh.userData.y * 0.34,
+        0
+      ));
+    });
+
+    cellMeshes.forEach((mesh, i) => {
+      mesh.visible = true;
+      mesh.position.copy(dropPositions[i]);
+      mesh.material.transparent = true;
+      mesh.material.opacity = 0;
+      mesh.scale.setScalar(0.96);
+    });
+  }
+
+  function easeInCubic(t) { return t * t * t; }
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+  function easeOutBack(t) {
+    const c1 = 0.42, c3 = c1 + 1;
+    return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+  }
+
+  function tick(now) {
+    if (!phaseStart) phaseStart = now;
+    const duration = phase === 'clear' ? CLEAR_MS : DROP_MS;
+    const t = Math.min((now - phaseStart) / duration, 1);
+
+    if (phase === 'clear') {
+      const e = easeInCubic(t);
+      cellMeshes.forEach((mesh, i) => {
+        mesh.position.copy(clearStart[i]).add(new THREE.Vector3(0, e * 1.35, 0));
+        mesh.material.transparent = true;
+        mesh.material.opacity = Math.max(0, 1 - e * 1.25);
+        if (mesh.userData.digit) mesh.userData.digit.visible = false;
+      });
+
+      if (t >= 1) {
+        prepareIntroDrop();
+        phase = 'drop';
+        phaseStart = now;
+      }
+    } else {
+      cellMeshes.forEach((mesh, i) => {
+        const layerDelay = mesh.userData.y * 0.13;
+        const cellDelay = (Math.abs(mesh.userData.x - 1) + Math.abs(mesh.userData.z - 1)) * 0.018;
+        const local = Math.max(0, Math.min((t - layerDelay - cellDelay) / 0.54, 1));
+        const e = easeOutCubic(local);
+        mesh.position.lerpVectors(dropPositions[i], endPositions[i], e);
+        mesh.material.opacity = Math.min(1, e * 1.35);
+        mesh.scale.setScalar(Math.min(1, 0.96 + easeOutBack(local) * 0.04));
+      });
+
+      if (t >= 1) {
+        cellMeshes.forEach((mesh, i) => {
+          mesh.position.copy(endPositions[i]);
+          mesh.material.opacity = 1;
+          mesh.material.transparent = false;
+          mesh.scale.setScalar(1);
+        });
+        animating = false;
+        onDone?.();
+        return;
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+function verticalPlaneTransition(onMidpoint) {
+  if (animating) return;
+  animating = true;
+  const EXIT_MS = 760;
+  const PAUSE_MS = 80;
+  const ENTER_MS = 640;
+  const PLANE_DELAY = 0.12;
+  const CELL_DELAY = 0.025;
+  const OFFSCREEN_Y = 7.2;
+  const startPos = cellMeshes.map(m => m.position.clone());
+  const exitTargets = startPos.map(pos => pos.clone().add(new THREE.Vector3(0, OFFSCREEN_Y, 0)));
+
+  let phase = 'exit', phaseStart = null;
+
+  function waveProgress(t, mesh) {
+    const planeDelay = (2 - mesh.userData.y) * PLANE_DELAY;
+    const cellDelay = (Math.abs(mesh.userData.x - 1) + Math.abs(mesh.userData.z - 1)) * CELL_DELAY;
+    const delay = planeDelay + cellDelay;
+    return Math.max(0, Math.min((t - delay) / (1 - delay), 1));
+  }
+
+  function easeInQuad(t) { return t * t; }
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function tick(now) {
+    if (!phaseStart) phaseStart = now;
+    const duration = phase === 'exit' ? EXIT_MS : phase === 'pause' ? PAUSE_MS : ENTER_MS;
+    const t = Math.min((now - phaseStart) / duration, 1);
+
+    if (phase === 'exit') {
+      cellMeshes.forEach((m, i) => {
+        const e = easeInQuad(waveProgress(t, m));
+        m.visible = true;
+        m.position.lerpVectors(startPos[i], exitTargets[i], e);
+        m.material.transparent = true;
+        m.material.opacity = Math.max(0, 1 - e * 1.25);
+      });
+      if (t >= 1) {
+        onMidpoint();
+        phase = 'pause';
+        phaseStart = now;
+      }
+
+    } else if (phase === 'pause') {
+      if (t >= 1) {
+        cellMeshes.forEach((m, i) => {
+          m.position.copy(exitTargets[i]);
+          m.material.opacity = 0;
+          m.scale.setScalar(1);
+        });
+        phase = 'enter';
+        phaseStart = now;
+      }
+
+    } else {
+      cellMeshes.forEach((m, i) => {
+        const e = easeOutCubic(waveProgress(t, m));
+        const view = FACE_VIEWS[activeFace];
+        const depth = depthFromFace(activeFace, m.userData[view.axis]);
+        const isSelected = currentScreen !== 'game-hud' || depth === activeDepth;
+        const isBehindOrSelected = currentScreen !== 'game-hud' || depth >= activeDepth;
+        const targetOpacity = isSelected ? 1 : 0.34;
+        const targetScale = isSelected ? 1 : 0.82;
+        m.position.lerpVectors(exitTargets[i], m.userData.homePos, e);
+        m.visible = isBehindOrSelected || e < 0.98;
+        m.material.transparent = true;
+        m.material.depthWrite = isSelected;
+        m.material.opacity = isBehindOrSelected ? Math.min(targetOpacity, e * 1.25) : Math.max(0, 1 - e);
+        m.scale.setScalar(0.82 + (targetScale - 0.82) * e);
+      });
+      if (t >= 1) {
+        cellMeshes.forEach(m => m.position.copy(m.userData.homePos));
+        if (currentScreen === 'game-hud') applyPlaneVisibility();
+        else showAllPlanes();
+        animating = false;
+        return;
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+function formatElapsed(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function completePuzzleAnimation() {
+  if (animating) return;
+  animating = true;
+  selectedCell = null;
+  guideVisible = false;
+  guideEl.classList.remove('show');
+  guideEl.setAttribute('aria-hidden', 'true');
+  document.getElementById('complete-title').textContent = `Puzzle #${String(currentPuzzleId || 0).padStart(3, '0')} completed`;
+  document.getElementById('complete-sub').textContent = `Completed in ${formatElapsed(performance.now() - puzzleStartTime)}`;
+  Storage.markCompleted('easy', currentPuzzleId);
+  refreshStats();
+
+  const startY = cubeGroup.position.y;
+  const SETTLE_MS = 500;
+  const SPIN_MS = 850;
+  const LIFT_MS = 720;
+  const startQuaternion = cubeGroup.quaternion.clone();
+  const endQuaternion = new THREE.Quaternion();
+  const settleCells = cellMeshes.map(mesh => ({
+    mesh,
+    pos: mesh.position.clone(),
+    scale: mesh.scale.x,
+    opacity: mesh.visible ? mesh.material.opacity : 0,
+    target: mesh.userData.targetHomePos.clone(),
+  }));
+  let phase = 'settle';
+  let phaseStart = null;
+
+  cellMeshes.forEach(mesh => {
+    mesh.visible = true;
+    mesh.material.color.set(COMPLETE_COLOR);
+    mesh.material.transparent = true;
+    mesh.material.depthWrite = true;
+    mesh.material.emissive?.set(0x000000);
+    if (mesh.userData.digit) mesh.userData.digit.visible = false;
+  });
+
+  function easeInCubic(t) { return t * t * t; }
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function tick(now) {
+    if (!phaseStart) phaseStart = now;
+    const duration = phase === 'settle' ? SETTLE_MS : (phase === 'spin' ? SPIN_MS : LIFT_MS);
+    const t = Math.min((now - phaseStart) / duration, 1);
+
+    if (phase === 'settle') {
+      const e = easeOutCubic(t);
+      cubeGroup.quaternion.slerpQuaternions(startQuaternion, endQuaternion, e);
+      settleCells.forEach(({ mesh, pos, scale, opacity, target }) => {
+        mesh.position.lerpVectors(pos, target, e);
+        mesh.scale.setScalar(scale + (1 - scale) * e);
+        mesh.material.opacity = opacity + (1 - opacity) * e;
+      });
+      if (t >= 1) {
+        cellMeshes.forEach(mesh => {
+          mesh.userData.homePos.copy(mesh.userData.targetHomePos);
+          mesh.position.copy(mesh.userData.homePos);
+        });
+        cubeGroup.quaternion.identity();
+        cubeGroup.rotation.set(0, 0, 0);
+        showCompletedShape();
+        phase = 'spin';
+        phaseStart = now;
+      }
+    } else if (phase === 'spin') {
+      cubeGroup.rotation.y = t * Math.PI * 4;
+      if (t >= 1) {
+        phase = 'lift';
+        phaseStart = now;
+      }
+    } else {
+      cubeGroup.rotation.y += 0.22;
+      cubeGroup.position.y = startY + easeInCubic(t) * 7.5;
+      if (t >= 1) {
+        animating = false;
+        goTo('complete');
+        return;
+      }
+    }
+    renderer.render(scene, camera);
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  if (currentScreen === 'game-hud' && !animating) {
+    cubeGroup.quaternion.slerp(targetQuaternion, 0.14);
+    updateCompletedMotion();
+    updateConflictShakes(performance.now());
+    updateDigitFaces();
+    renderGuide();
+  } else if (currentScreen === 'intro' && !animating) {
+    cubeGroup.rotation.y += SPIN_SPEED;
+  }
+  renderer.render(scene, camera);
+}
+animate();
+
+// ── STATS ─────────────────────────────────────────
+function refreshStats() {
+  const s = Storage.getStats('easy');
+  document.getElementById('stat-played').textContent    = s.played;
+  document.getElementById('stat-completed').textContent = s.completed;
+  document.getElementById('stat-remaining').textContent = Math.max(0, 500 - s.played);
+}
+refreshStats();
+
+// ── TOAST ─────────────────────────────────────────
+const toastEl = document.getElementById('toast');
+let toastTmr;
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTmr);
+  toastTmr = setTimeout(() => toastEl.classList.remove('show'), 2800);
+}
+
+// ── LAUNCH PUZZLE ─────────────────────────────────
+function launchPuzzle(mode, specificId) {
+  if (animating) return;
+  let entry;
+
+  if (mode === 'new') {
+    const played = Storage.getPlayedIds('easy');
+    const pool   = Array.from({length:500}, (_,i) => i+1).filter(id => !played.has(id));
+    entry = pool.length
+      ? PuzzleLoader.getClone('easy', pool[Math.floor(Math.random() * pool.length)])
+      : (showToast('All 500 played — going random'), PuzzleLoader.getRandom('easy'));
+  } else if (mode === 'any') {
+    entry = PuzzleLoader.getRandom('easy');
+  } else {
+    entry = PuzzleLoader.getClone('easy', specificId);
+    if (!entry) { showToast('Puzzle not found'); return; }
+  }
+
+  Storage.markPlayed('easy', entry.id);
+  currentPuzzleId = entry.id;
+  currentSolution = entry.solution || SOLUTION;
+  puzzleStartTime = performance.now();
+  completionStarted = false;
+  document.getElementById('hud-id').textContent = `EASY · #${String(entry.id).padStart(3,'0')}`;
+
+  verticalPlaneTransition(() => {
+    // Recolour cells once the intro cube has moved offscreen.
+    completedPlanes = new Set();
+    forEachCell((mesh, x, y, z) => {
+      mesh.userData.homePos.copy(mesh.userData.baseHomePos);
+      mesh.userData.targetHomePos.copy(mesh.userData.baseHomePos);
+      mesh.position.copy(mesh.userData.baseHomePos);
+      const clue = entry.puzzle[x][y][z];
+      setCellFace(mesh, clue, clue !== 0);
+    });
+    updateEntryConflicts();
+    updateCompletedPlanes();
+    completionStarted = false;
+    resetCubeView(0, true);
+    updateDigitFaces();
+    goTo('game-hud');
+  });
+}
+
+// ── NAV ───────────────────────────────────────────
+document.addEventListener('pointerdown', ensureAudio, { once: true });
+document.addEventListener('keydown', ensureAudio, { once: true });
+document.querySelectorAll('.btn, .back-btn, .opt, .complete-check').forEach(el => {
+  el.addEventListener('click', () => playSound('tap'));
+});
+
+document.getElementById('btn-play').addEventListener('click', () => launchPuzzle('new'));
+document.getElementById('btn-choose').addEventListener('click', () => goTo('select'));
+
+document.getElementById('opt-new').addEventListener('click', () => launchPuzzle('new'));
+document.getElementById('opt-any').addEventListener('click', () => launchPuzzle('any'));
+document.getElementById('opt-specific').addEventListener('click', () => goTo('picker'));
+
+document.getElementById('btn-go').addEventListener('click', () => {
+  const id = parseInt(document.getElementById('puzzle-num-input').value, 10);
+  if (!id || id < 1 || id > 500) { showToast('Enter 1 – 500'); return; }
+  launchPuzzle('specific', id);
+});
+document.getElementById('puzzle-num-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-go').click();
+});
+
+document.getElementById('back-from-select').addEventListener('click', navigateBack);
+document.getElementById('back-from-picker').addEventListener('click', navigateBack);
+
+document.getElementById('back-from-game').addEventListener('click', () => {
+  if (animating) return;
+  dropIntroCubeFromTop(() => {
+    cubeGroup.rotation.set(0, 0, 0);
+  });
+  refreshStats();
+});
+</script>
+</body>
+</html>
