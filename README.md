@@ -71,3 +71,20 @@ Run the puzzle logic tests with:
 ```bash
 node test.js
 ```
+## Screens
+
+### Home Screen
+
+Spinning Cube with a play button which brings you to the select screen.
+![Sudokube spinning cube](docs\sudokube.gif)
+
+### Select Puzzle Screen
+
+Theres a random puzzle of ones you havent played one that lets you play ones youve already completed or played and then choose specific which has a slider for 1-500 puzzles.
+![Select Screen](docs\select-puzzle-screen.png)
+
+### Play Screen
+
+Theres a cube you can click cells and enter a number either through your keyboard or clicked and then using the small entry calculator bottom right. There is also a cheat sheet key top left of the screen.
+![Playing Screen](docs\play-screen.png)
+
