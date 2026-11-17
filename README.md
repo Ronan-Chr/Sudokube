@@ -3,9 +3,18 @@
 Sudokube is a browser-based 3D Sudoku puzzle game. It runs entirely in the browser as a static site. The idea is a sudoku board with a z axis making a 3x3x3 cube similar to a Rubik's cube and has 1 through 9 appearing 1 time on each unique axis and having no overlap between them. Its human solvable and harder then you'd think. 
 
 # Why Play
-Its a fun brain game meant to give you something to do to keep your brain stimulated in a way things like chess and normal sudoku do. A good way too track your left brain thinking for yourself as well.
+Its a fun brain game meant to give you something to do to keep your brain stimulated in a way things like chess and normal sudoku do. A good way too track your left brain thinking for yourself as well.The Three.js runtime files used by the game are bundled locally in `vendor/` so the published site does not depend on CDN-hosted game scripts.
 
-The Three.js runtime files used by the game are bundled locally in `vendor/` so the published site does not depend on CDN-hosted game scripts.
+## How it works
+- **Puzzle data:** `easy-puzzles.js` holds 500 pre-generated puzzles. Each has an `id`, a `seed` (0xDEADBEEF + id, so puzzle N is always the same), a clue count, the grid `p[x][y][z]` (0 = empty) and the answer key `s[x][y][z]`.
+- **Loading puzzles:** `puzzle-loader.js` stores puzzles in a Map keyed by puzzle number. `getClone()` returns a safe copy, `getSolution()` returns the answer key, and `getRandom()`, `getNext()` and `getPrev()` handle navigation.
+- **Choosing a puzzle:** Play picks one you haven't played, Random Any picks from all 500, and Choose Specific loads one by number.
+- **Rules:** every cell sits in three 3x3 planes (same x, y or z), and each plane must contain 1 to 9 exactly once.
+- **Checking answers:** entries that repeat a number in a plane are flagged and shake. A plane is solved when it matches the answer key, and the puzzle is complete when every plane matches.
+- **Rendering:** Three.js (bundled in `vendor/`) draws the 27 cells and animates the title spin, the explode and reassemble effect, and layer switching.
+- **Saving progress:** `storage.js` saves history to `localStorage` (`sudokube_history`) behind one interface, so it can be swapped for the planned backend API.
+- **Tests:** `node test.js` checks the validation, generator and solver in `sudoku3d.js`.
+
 ## Tech Stack
 
 <table>
