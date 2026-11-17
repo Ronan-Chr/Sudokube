@@ -2,6 +2,9 @@
 
 Sudokube is a browser-based 3D Sudoku puzzle game. It runs entirely in the browser as a static site. The idea is a sudoku board with a z axis making a 3x3x3 cube similar to a Rubik's cube and has 1 through 9 appearing 1 time on each unique axis and having no overlap between them. Its human solvable and harder then you'd think. 
 
+# Why Play
+Its a fun brain game meant to give you something to do to keep your brain stimulated in a way things like chess and normal sudoku do. A good way too track your left brain thinking for yourself as well.
+
 The Three.js runtime files used by the game are bundled locally in `vendor/` so the published site does not depend on CDN-hosted game scripts.
 ## Tech Stack
 
@@ -28,7 +31,7 @@ Front End- JS, HTML/CSS and Three.js for cubes<br>
   Database- PostgreSQL<br>
   Testing- node test.js<br>
   Deployment- Docker + GitHub Actions + Google Cloud<br>
-  AI- Continued Use for animations and chatbot assistance for major edge case bugs I cant find any help with
+  AI- Continued Use for animations and chatbot assistance for major edge case bugs I cant find any help with (Claude, Codex)
 </td>
 </tr>
 </table>
@@ -85,6 +88,15 @@ Theres a random puzzle of ones you havent played one that lets you play ones you
 
 ### Play Screen
 
-Theres a cube you can click cells and enter a number either through your keyboard or clicked and then using the small entry calculator bottom right. There is also a cheat sheet key top left of the screen.
+Theres a cube you can click cells and enter a number either through your keyboard or clicked and then using the small entry calculator bottom right with 1-9 availible. There is also a cheat sheet key top left of the screen.
 ![Playing Screen](docs\play-screen.png)
+
+## Feedback to be acted on
+- Golf Mode (Perspective changes deduct points higher the better)
+- Calculator shading out when a number is verifiably correct 3 times across a puzzle
+- A way to have note taking on perspectives or cells (potentially labels as dots)
+- Accounts for users
+- A daily cube puzzle (The same for all user timed and no hints or cheat sheet with a leaderboard for comparison)
+- A performance page with puzzles completed with hints average times and any other comprehenssive stats
+- A better experience for mobile
 
