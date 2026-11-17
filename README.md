@@ -1,8 +1,42 @@
 # Sudokube
 
-Sudokube is a browser-based 3D Sudoku puzzle game. It runs entirely in the browser as a static site.
+Sudokube is a browser-based 3D Sudoku puzzle game. It runs entirely in the browser as a static site. The idea is a sudoku board with a z axis making a 3x3x3 cube similar to a Rubik's cube and has 1 through 9 appearing 1 time on each unique axis and having no overlap between them. Its human solvable and harder then you'd think. 
 
 The Three.js runtime files used by the game are bundled locally in `vendor/` so the published site does not depend on CDN-hosted game scripts.
+## Tech Stack
+
+<table>
+<tr>
+<td width="25%" valign="top"><strong>Current Tech Stack</strong></td>
+<td width="75%">
+Front End- JS, HTML/CSS and Three.js for cubes<br> 
+  Back End- None (Static)<br>
+  Database- Local Storage<br>
+  Testing- node test.js<br>
+  Deployment- Github Pages<br>
+  AI- Used for Animations
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td width="25%" valign="top"><strong>Planned Tech Stack</strong></td>
+<td width="75%">
+Front End- JS, HTML/CSS and Three.js for cubes<br> 
+  Back End- Node.js and Express API<br>
+  Database- PostgreSQL<br>
+  Testing- node test.js<br>
+  Deployment- Docker + GitHub Actions + Google Cloud<br>
+  AI- Continued Use for animations and chatbot assistance for major edge case bugs I cant find any help with
+</td>
+</tr>
+</table>
+
+
+## Live Demo
+
+Link- https://ronan-chr.github.io/Sudokube/
 
 ## Play Locally
 
