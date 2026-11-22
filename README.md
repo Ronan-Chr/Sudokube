@@ -15,6 +15,12 @@ Its a fun brain game meant to give you something to do to keep your brain stimul
 - **Saving progress:** `storage.js` saves history to `localStorage` (`sudokube_history`) behind one interface, so it can be swapped for the planned backend API.
 - **Tests:** `node test.js` checks the validation, generator and solver in `sudoku3d.js`.
 
+## Project Status
+
+- The game is playable now (500 puzzles, local progress saving).
+- Sprint 1 (MVP), in progress: Docker container, Google Cloud Run deployment, and CI with GitHub Actions running `node test.js`.
+- Sprint 2 (Final): hints and user accounts.
+
 ## Tech Stack
 
 <table>
@@ -55,6 +61,12 @@ Link (Google Cloud)- PLACEHOLDER REPLACE ONCE DEPLOYED
 
 Link (Static Github Pages)- https://ronan-chr.github.io/Sudokube/
 
+Deployed URL (Cloud Run): PLACEHOLDER
+
+Jira board (Sprints): https://ronan2249.atlassian.net/jira/software/projects/SUD/boards/37 
+
+Confluence: https://ronan2249.atlassian.net/wiki/spaces/SUD/overview
+
 ## Play Locally
 
 Because the app uses JavaScript modules, run it from a small local server:
@@ -68,6 +80,31 @@ Then open:
 ```text
 http://127.0.0.1:4173/index.html
 ```
+
+## Run With Docker
+
+The app is on a static server by using `nginx:alpine` on port 8080.
+
+```bash
+docker build -t sudokube .
+docker run -p 8080:8080 sudokube
+```
+
+Then open:
+
+```text
+http://localhost:8080
+```
+
+## Deploy to Cloud Run
+
+From the project folder, with the Google Cloud CLI installed and logged in:
+
+```bash
+gcloud run deploy --source .
+```
+
+Pick a region and allow unauthenticated access when asked. The command prints the service URL when it finishes.
 
 ## Publish With GitHub Pages
 
@@ -88,22 +125,28 @@ Run the puzzle logic tests with:
 ```bash
 node test.js
 ```
+## Git Workflow
+
+- `main` always holds working code.
+- New work goes on a feature branch (for example `feature/dockerfile`).
+- Each branch is merged into `main` through a pull request after `node test.js` passes.
+
 ## Screens
 
 ### Home Screen
 
 Spinning Cube with a play button which brings you to the select screen.
-![Sudokube spinning cube](docs\sudokube.gif)
+![Sudokube spinning cube](docs/sudokube.gif)
 
 ### Select Puzzle Screen
 
 Theres a random puzzle of ones you havent played one that lets you play ones youve already completed or played and then choose specific which has a slider for 1-500 puzzles.
-![Select Screen](docs\select-puzzle-screen.png)
+![Select Screen](docs/select-puzzle-screen.png)
 
 ### Play Screen
 
 Theres a cube you can click cells and enter a number either through your keyboard or clicked and then using the small entry calculator bottom right with 1-9 availible. There is also a cheat sheet key top left of the screen.
-![Playing Screen](docs\play-screen.png)
+![Playing Screen](docs/play-screen.png)
 
 ## Feedback to be acted on
 - Golf Mode (Perspective changes deduct points higher the better)
@@ -115,5 +158,16 @@ Theres a cube you can click cells and enter a number either through your keyboar
 - A better experience for mobile
 
 ## Sprint Progression (Sprint 1)
-- Current status: 
+ Current status: 
 
+- [ ]
+SUD4- As a player, I want a wrong number to be replaced cleanly when I enter the right one, so that the cube never shows a false state.Description Acceptance criteria: Entering multiple wrong numbers and then the right one shows only the right number as solved cell. Colors go to the wrong answer as green for some reason in this specific condtion so that not happening
+
+- [ ]
+SUD30- As the developer, I want the app in Docker and deployed to Google Cloud, so that it runs the same everywhere. Description Acceptance criteria: The app builds and runs from a Docker image. A live URL serves the app from Cloud Run
+
+- [ ]
+SUD34- As the developer, I want GitHub Actions to test and deploy on every push, so that bugs are caught early. Description Acceptance criteria: A push to main runs the tests. If the tests pass, the app deploys automatically. Automate the bug catching process
+
+- [x] (Done besides the Actual Deployed Links)
+SUD38- Update the README for the MVP Description Acceptance criteria: Add current status, setup steps (local, Docker, Cloud Run), the Cloud Run URL, and a section on AI tools used. Do it on a feature branch and merge with a PR.
