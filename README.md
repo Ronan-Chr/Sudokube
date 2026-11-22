@@ -158,5 +158,16 @@ Theres a cube you can click cells and enter a number either through your keyboar
 - A better experience for mobile
 
 ## Sprint Progression (Sprint 1)
-- Current status: 
+ Current status: 
 
+- [ ]
+SUD4- As a player, I want a wrong number to be replaced cleanly when I enter the right one, so that the cube never shows a false state.Description Acceptance criteria: Entering multiple wrong numbers and then the right one shows only the right number as solved cell. Colors go to the wrong answer as green for some reason in this specific condtion so that not happening
+
+- [ ]
+SUD30- As the developer, I want the app in Docker and deployed to Google Cloud, so that it runs the same everywhere. Description Acceptance criteria: The app builds and runs from a Docker image. A live URL serves the app from Cloud Run
+
+- [ ]
+SUD34- As the developer, I want GitHub Actions to test and deploy on every push, so that bugs are caught early. Description Acceptance criteria: A push to main runs the tests. If the tests pass, the app deploys automatically. Automate the bug catching process
+
+- [x] (Done besides the Actual Deployed Links)
+SUD38- Update the README for the MVP Description Acceptance criteria: Add current status, setup steps (local, Docker, Cloud Run), the Cloud Run URL, and a section on AI tools used. Do it on a feature branch and merge with a PR.
