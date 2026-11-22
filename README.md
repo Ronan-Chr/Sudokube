@@ -15,6 +15,12 @@ Its a fun brain game meant to give you something to do to keep your brain stimul
 - **Saving progress:** `storage.js` saves history to `localStorage` (`sudokube_history`) behind one interface, so it can be swapped for the planned backend API.
 - **Tests:** `node test.js` checks the validation, generator and solver in `sudoku3d.js`.
 
+## Project Status
+
+- The game is playable now (500 puzzles, local progress saving).
+- Sprint 1 (MVP), in progress: Docker container, Google Cloud Run deployment, and CI with GitHub Actions running `node test.js`.
+- Sprint 2 (Final): hints and user accounts.
+
 ## Tech Stack
 
 <table>
@@ -50,6 +56,12 @@ Front End- JS, HTML/CSS and Three.js for cubes<br>
 
 Link- https://ronan-chr.github.io/Sudokube/
 
+Deployed URL (Cloud Run): PLACEHOLDER
+
+Jira board: https://ronan2249.atlassian.net/jira/software/projects/SUD/boards/37
+
+Confluence: https://ronan2249.atlassian.net/wiki/spaces/SUD/overview
+
 ## Play Locally
 
 Because the app uses JavaScript modules, run it from a small local server:
@@ -63,6 +75,31 @@ Then open:
 ```text
 http://127.0.0.1:4173/index.html
 ```
+
+## Run With Docker
+
+The app is on a static server by using `nginx:alpine` on port 8080.
+
+```bash
+docker build -t sudokube .
+docker run -p 8080:8080 sudokube
+```
+
+Then open:
+
+```text
+http://localhost:8080
+```
+
+## Deploy to Cloud Run
+
+From the project folder, with the Google Cloud CLI installed and logged in:
+
+```bash
+gcloud run deploy --source .
+```
+
+Pick a region and allow unauthenticated access when asked. The command prints the service URL when it finishes.
 
 ## Publish With GitHub Pages
 
@@ -83,22 +120,28 @@ Run the puzzle logic tests with:
 ```bash
 node test.js
 ```
+## Git Workflow
+
+- `main` always holds working code.
+- New work goes on a feature branch (for example `feature/dockerfile`).
+- Each branch is merged into `main` through a pull request after `node test.js` passes.
+
 ## Screens
 
 ### Home Screen
 
 Spinning Cube with a play button which brings you to the select screen.
-![Sudokube spinning cube](docs\sudokube.gif)
+![Sudokube spinning cube](docs/sudokube.gif)
 
 ### Select Puzzle Screen
 
 Theres a random puzzle of ones you havent played one that lets you play ones youve already completed or played and then choose specific which has a slider for 1-500 puzzles.
-![Select Screen](docs\select-puzzle-screen.png)
+![Select Screen](docs/select-puzzle-screen.png)
 
 ### Play Screen
 
 Theres a cube you can click cells and enter a number either through your keyboard or clicked and then using the small entry calculator bottom right with 1-9 availible. There is also a cheat sheet key top left of the screen.
-![Playing Screen](docs\play-screen.png)
+![Playing Screen](docs/play-screen.png)
 
 ## Feedback to be acted on
 - Golf Mode (Perspective changes deduct points higher the better)
