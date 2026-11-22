@@ -32,7 +32,7 @@ Front End- JS, HTML/CSS and Three.js for cubes<br>
   Database- Local Storage<br>
   Testing- node test.js<br>
   Deployment- Github Pages<br>
-  AI- Used for Animations
+  AI- Used for Animations and Copilot in VScode for manual coding in line suggestions and debugging (Typos)
 </td>
 </tr>
 </table>
@@ -52,13 +52,18 @@ Front End- JS, HTML/CSS and Three.js for cubes<br>
 </table>
 
 
-## Live Demo
+## Live Demo Links
+Link (Jira)- https://ronan2249.atlassian.net/?continue=https%3A%2F%2Fronan2249.atlassian.net%2Fwelcome%2Fsoftware%3FprojectId%3D10036&atlOrigin=eyJpIjoiMzEzOTdjNDAwMDYxNDhhMTg3MzEyY2M3MWFlNTg5NWMiLCJwIjoiamlyYS1zb2Z0d2FyZSJ9
 
-Link- https://ronan-chr.github.io/Sudokube/
+Link (Confluence)- PLACEHOLDER REPLACE ONCE DEPLOYED
+
+Link (Google Cloud)- PLACEHOLDER REPLACE ONCE DEPLOYED
+
+Link (Static Github Pages)- https://ronan-chr.github.io/Sudokube/
 
 Deployed URL (Cloud Run): PLACEHOLDER
 
-Jira board: https://ronan2249.atlassian.net/jira/software/projects/SUD/boards/37
+Jira board (Sprints): https://ronan2249.atlassian.net/jira/software/projects/SUD/boards/37 
 
 Confluence: https://ronan2249.atlassian.net/wiki/spaces/SUD/overview
 
@@ -151,4 +156,7 @@ Theres a cube you can click cells and enter a number either through your keyboar
 - A daily cube puzzle (The same for all user timed and no hints or cheat sheet with a leaderboard for comparison)
 - A performance page with puzzles completed with hints average times and any other comprehenssive stats
 - A better experience for mobile
+
+## Sprint Progression (Sprint 1)
+- Current status: 
 
