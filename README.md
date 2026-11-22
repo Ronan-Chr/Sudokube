@@ -96,6 +96,24 @@ Then open:
 http://localhost:8080
 ```
 
+## Run With Docker Compose
+
+```bash
+docker compose up --build
+```
+
+Then open:
+
+```text
+http://localhost:8081
+```
+
+Stop it with:
+
+```bash
+docker compose down
+```
+
 ## Deploy to Cloud Run
 
 From the project folder, with the Google Cloud CLI installed and logged in:
