@@ -53,15 +53,10 @@ Front End- JS, HTML/CSS and Three.js for cubes<br>
 
 
 ## Live Demo Links
-Link (Jira)- https://ronan2249.atlassian.net/?continue=https%3A%2F%2Fronan2249.atlassian.net%2Fwelcome%2Fsoftware%3FprojectId%3D10036&atlOrigin=eyJpIjoiMzEzOTdjNDAwMDYxNDhhMTg3MzEyY2M3MWFlNTg5NWMiLCJwIjoiamlyYS1zb2Z0d2FyZSJ9
-
-Link (Confluence)- PLACEHOLDER REPLACE ONCE DEPLOYED
-
-Link (Google Cloud)- PLACEHOLDER REPLACE ONCE DEPLOYED
 
 Link (Static Github Pages)- https://ronan-chr.github.io/Sudokube/
 
-Deployed URL (Cloud Run): PLACEHOLDER
+Deployed URL (Cloud Run): https://sudokube-580113394078.us-central1.run.app/
 
 Jira board (Sprints): https://ronan2249.atlassian.net/jira/software/projects/SUD/boards/37 
 
@@ -178,10 +173,10 @@ Theres a cube you can click cells and enter a number either through your keyboar
 ## Sprint Progression (Sprint 1)
  Current status: 
 
-- [ ]
+- [x]
 SUD4- As a player, I want a wrong number to be replaced cleanly when I enter the right one, so that the cube never shows a false state.Description Acceptance criteria: Entering multiple wrong numbers and then the right one shows only the right number as solved cell. Colors go to the wrong answer as green for some reason in this specific condtion so that not happening
 
-- [ ]
+- [x]
 SUD30- As the developer, I want the app in Docker and deployed to Google Cloud, so that it runs the same everywhere. Description Acceptance criteria: The app builds and runs from a Docker image. A live URL serves the app from Cloud Run
 
 - [ ]
@@ -189,3 +184,35 @@ SUD34- As the developer, I want GitHub Actions to test and deploy on every push,
 
 - [x] (Done besides the Actual Deployed Links)
 SUD38- Update the README for the MVP Description Acceptance criteria: Add current status, setup steps (local, Docker, Cloud Run), the Cloud Run URL, and a section on AI tools used. Do it on a feature branch and merge with a PR.
+
+## AI Tool Usage
+
+Rule I use is to never believe AI or trust it for anything it makes assumptions that end up breaking things later I only like asking for advice if Im getting an error I dont understand or if its a copilot suggestion I was already going to do and my autocomplete doesnt go further then the line Im on to protect it from haiving code I dont want or features I dont want. (Also never let AI access a repo I only like to paste errors from the terminal and ask why is this happening If I cant fix it)
+
+<table>
+<tr>
+<td width="25%" valign="top"><strong>Docker Debugging (Claude)</strong></td>
+<td width="75%">
+  <code>docker build</code> failed with "failed to connect to the docker API".<br>
+  Claude helped me figure out the Docker Desktop engine wasn't running.<br>
+  After starting it, port 8080 was already in use on my PC, so I ran the container with <code>-p 8081:8080</code>.<br>
+  I tested it at localhost:8081 and confirmed the game loaded.
+</td>
+</tr>
+<tr>
+<td width="25%" valign="top"><strong>Branch / Version Mismatch (Claude)</strong></td>
+<td width="75%">
+  My README changes wouldn't push because GitHub's <code>main</code> had a newer commit than my local copy in VS Code.<br>
+  Claude helped me see it was a version mismatch and walked me through <code>git stash</code>, <code>git pull</code> and merging <code>main</code> into my branch.<br>
+  I ran the commands, resolved the README merge and merged the PR.
+</td>
+</tr>
+<tr>
+<td width="25%" valign="top"><strong>Autocomplete (GitHub Copilot)</strong></td>
+<td width="75%">
+  I sometimes use Copilot's built-in autocomplete.<br>
+  If it suggests something I don't know, like <code>.strip()</code> or <code>.length</code>, I research what it does first.<br>
+  I only keep it if it's a good fit for what I'm coding.
+</td>
+</tr>
+</table>
