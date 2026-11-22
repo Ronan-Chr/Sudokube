@@ -1,0 +1,5 @@
+services:
+  sudokube:
+    build: .
+    ports:
+      - "8081:8080"
